@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Central tendency explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Spectral:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --paper:#F2F5F7; --panel:#FFFFFF; --ink:#18233F; --muted:#5B667D;
+  --grid:#DCE3EA; --curve:#2350A8; --band1:rgba(35,80,168,.26); --band2:rgba(35,80,168,.15); --band3:rgba(35,80,168,.07);
+  --ref:#8C95A6; --line:#C9D2DC;
+  --mean:#A3245E; --median:#0E7C61; --mode:#B06A00;
+  --sans:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Spectral",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#10182B; --panel:#172240; --ink:#E8ECF4; --muted:#A3AEC4;
+    --grid:#24314F; --curve:#7FA6F0; --band1:rgba(127,166,240,.30); --band2:rgba(127,166,240,.17); --band3:rgba(127,166,240,.08);
+    --ref:#7A869E; --line:#2C3A5C;
+    --mean:#F07AAE; --median:#4FD1A8; --mode:#F5B64A;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#10182B; --panel:#172240; --ink:#E8ECF4; --muted:#A3AEC4;
+  --grid:#24314F; --curve:#7FA6F0; --band1:rgba(127,166,240,.30); --band2:rgba(127,166,240,.17); --band3:rgba(127,166,240,.08);
+  --ref:#7A869E; --line:#2C3A5C;
+  --mean:#F07AAE; --median:#4FD1A8; --mode:#F5B64A;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5}
+main{max-width:1080px;margin:0 auto;padding:28px 20px 48px}
+h1{font-family:var(--serif);font-weight:700;font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.1;margin:0 0 6px;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 24px;max-width:66ch}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:20px;align-items:start}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+.plot{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 12px 6px;position:relative}
+svg{display:block;width:100%;height:auto;touch-action:none}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font-size:13px;padding:6px 9px;border-radius:6px;white-space:nowrap;opacity:0;transition:opacity .1s}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted);padding:6px 8px 4px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:18px;height:10px;border-radius:2px;display:inline-block}
+.shape{margin:14px 4px 0;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:15px}
+.shape b{font-family:var(--serif);font-size:1.05rem}
+aside{display:flex;flex-direction:column;gap:16px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.ctrl+.ctrl{margin-top:16px}
+.ctrl-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+.ctrl-head label{font-weight:700;display:inline-flex;align-items:center;gap:8px}
+.key{width:18px;height:0;border-top-width:3px;display:inline-block}
+.val{font-family:var(--serif);font-size:1.45rem;font-weight:700;font-variant-numeric:tabular-nums}
+.sym{font-family:var(--serif);font-style:italic;color:var(--muted);font-weight:500}
+input[type=range]{width:100%;height:28px;cursor:pointer;margin:0}
+#mu{accent-color:var(--mean)} #med{accent-color:var(--median)} #mod{accent-color:var(--mode)} #sd{accent-color:var(--curve)}
+.range-ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:-4px;font-variant-numeric:tabular-nums}
+.divider{border:0;border-top:1px solid var(--line);margin:18px 0 14px}
+.btns{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+button{font:inherit;font-size:14px;font-weight:700;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+button.primary{background:var(--curve);color:var(--panel);border-color:var(--curve)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--mean);outline-offset:2px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:10px;cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--curve)}
+.hint{font-size:13px;color:var(--muted);margin:10px 0 0}
+dl{margin:0;display:grid;grid-template-columns:1fr auto;row-gap:6px;font-size:14px}
+dt{color:var(--muted)} dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.formula{font-family:var(--serif);font-size:15px;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--line);color:var(--muted)}
+.notes{margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.notes h2{font-family:var(--serif);font-size:1.15rem;margin:0 0 4px}
+.notes p{margin:0;color:var(--muted);font-size:15px;max-width:60ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Central tendency explorer</h1>
+  <p class="lede">Move the mean, median, mode and standard deviation and watch the curve respond. When all three centres line up, the curve is a symmetric normal distribution. Pull the median or mode away from the mean and the curve becomes skewed. The lower axis shows every point as a z-score, the normalized scale where the mean is 0 and one SD is 1.</p>
+
+  <div class="layout">
+    <div>
+      <div class="plot" id="plot">
+        <svg id="chart" viewBox="0 0 720 440" role="img" aria-label="Distribution curve with mean, median and mode markers"></svg>
+        <div class="tip" id="tip"></div>
+        <div class="legend">
+          <span><i class="key" style="border-top:3px solid var(--mean)"></i>mean</span>
+          <span><i class="key" style="border-top:3px dashed var(--median)"></i>median</span>
+          <span><i class="key" style="border-top:3px dotted var(--mode)"></i>mode</span>
+          <span id="lb1"><i class="sw" style="background:var(--band1)"></i>mean ± 1 SD</span>
+          <span id="lb2"><i class="sw" style="background:var(--band2)"></i>mean ± 2 SD</span>
+          <span id="refLegend"><i class="key" style="border-top:2px dashed var(--ref)"></i>standard normal (0, 1)</span>
+        </div>
+      </div>
+      <p class="shape" id="shape" aria-live="polite"></p>
+    </div>
+
+    <aside>
+      <div class="box">
+        <div class="ctrl">
+          <div class="ctrl-head"><label for="mu"><i class="key" style="border-top:3px solid var(--mean)"></i>Mean <span class="sym">μ</span></label><span class="val" id="muVal">0.00</span></div>
+          <input type="range" id="mu" min="-5" max="5" step="0.05" value="0">
+          <div class="range-ends"><span>−5</span><span>5</span></div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head"><label for="med"><i class="key" style="border-top:3px dashed var(--median)"></i>Median</label><span class="val" id="medVal">0.00</span></div>
+          <input type="range" id="med" step="0.005">
+          <div class="range-ends"><span id="medMin"></span><span id="medMax"></span></div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head"><label for="mod"><i class="key" style="border-top:3px dotted var(--mode)"></i>Mode</label><span class="val" id="modVal">0.00</span></div>
+          <input type="range" id="mod" step="0.01">
+          <div class="range-ends"><span id="modMin"></span><span id="modMax"></span></div>
+        </div>
+        <hr class="divider">
+        <div class="ctrl">
+          <div class="ctrl-head"><label for="sd">Standard deviation <span class="sym">σ</span></label><span class="val" id="sdVal">1.00</span></div>
+          <input type="range" id="sd" min="0.5" max="4" step="0.05" value="1">
+          <div class="range-ends"><span>0.5</span><span>4</span></div>
+        </div>
+        <p class="hint">The median and mode sliders only cover positions a single-peaked curve with this mean and SD can reach. Raise the SD to give them more room.</p>
+        <div class="btns">
+          <button class="primary" id="reset">Reset to standard normal</button>
+          <button id="sym">Make symmetric</button>
+        </div>
+        <label class="check"><input type="checkbox" id="showRef" checked> Show standard normal for comparison</label>
+        <label class="check"><input type="checkbox" id="showBands" checked> Shade SD bands</label>
+      </div>
+
+      <div class="box">
+        <dl>
+          <dt>Mean</dt><dd id="oMean"></dd>
+          <dt>Median</dt><dd id="oMed"></dd>
+          <dt>Mode</dt><dd id="oMod"></dd>
+          <dt>Standard deviation</dt><dd id="oSd"></dd>
+          <dt>Variance σ²</dt><dd id="oVar"></dd>
+          <dt>Skewness</dt><dd id="oSkew"></dd>
+          <dt>Within mean ± 1 SD</dt><dd id="o1"></dd>
+          <dt>Within mean ± 2 SD</dt><dd id="o2"></dd>
+        </dl>
+        <p class="formula">z = (x − μ) / σ</p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="notes">
+    <div><h2>Symmetric curves</h2><p>In a normal distribution the mean, median and mode are the same number. Moving the mean slides the whole curve without changing its shape.</p></div>
+    <div><h2>Skewed curves</h2><p>Drag the mode away from the mean and a tail grows on the other side. The mean is pulled furthest toward the tail, the mode stays at the peak, and the median always sits between them.</p></div>
+    <div><h2>Rule of thumb</h2><p>For moderately skewed data, the gap between mean and mode is roughly three times the gap between mean and median. That is why the median slider moves in much smaller steps than the mode slider.</p></div>
+    <div><h2>Normalizing</h2><p>Hover over the curve to read any point as a z-score. For a symmetric curve, z = 1 always has 84.1% of values below it. Once the curve is skewed, that share changes.</p></div>
+  </section>
+</main>
+
+<script>
+(function(){
+  const W=720,H=440,L=48,R=16,T=34,B=78;
+  const XMIN=-12,XMAX=12,YMAX=1.0;
+  const SQ2PI=Math.sqrt(2/Math.PI);
+  const svg=document.getElementById('chart');
+  const NS='http://www.w3.org/2000/svg';
+  const $=id=>document.getElementById(id);
+  const mu=$('mu'),sd=$('sd'),med=$('med'),mod=$('mod');
+  const showRef=$('showRef'),showBands=$('showBands'),tip=$('tip'),plot=$('plot');
+  const px=x=>L+(x-XMIN)/(XMAX-XMIN)*(W-L-R);
+  const py=y=>T+(1-Math.min(y,YMAX)/YMAX)*(H-T-B);
+  const xFromPx=p=>XMIN+(p-L)/(W-L-R)*(XMAX-XMIN);
+  function erf(x){const t=1/(1+0.3275911*Math.abs(x));const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;}
+  const Phi=z=>0.5*(1+erf(z/Math.SQRT2));
+  const phi=z=>Math.exp(-0.5*z*z)/Math.sqrt(2*Math.PI);
+  const el=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||svg).appendChild(e);return e;};
+  const fmt=(n,d=2)=>{const s=Math.abs(n).toFixed(d);return (n<0&&+s!==0?'−':'')+s;};
+
+  // Skew-normal parameterised by mean m, SD s and shape delta (−1..1)
+  function params(m,s,d){const w=s/Math.sqrt(1-2*d*d/Math.PI);return{xi:m-w*d*SQ2PI,w,a:d/Math.sqrt(1-d*d)};}
+  function pdfP(x,p){const z=(x-p.xi)/p.w;return 2/p.w*phi(z)*Phi(p.a*z);}
+
+  // Lookup table: standardized (mean 0, SD 1) median and mode offsets for each delta
+  const DMAX=0.995,NT=241,tD=[],tMed=[],tMod=[];
+  (function(){
+    const N=3201,X0=-7,X1=7,h=(X1-X0)/(N-1);
+    for(let i=0;i<NT;i++){
+      const d=-DMAX+2*DMAX*i/(NT-1);const p=params(0,1,d);
+      let f=new Float64Array(N),best=0;
+      for(let j=0;j<N;j++){f[j]=pdfP(X0+j*h,p);if(f[j]>f[best])best=j;}
+      let xm=X0+best*h;
+      if(best>0&&best<N-1){const a=f[best-1],b=f[best],c=f[best+1],den=a-2*b+c;if(den<0)xm+=0.5*h*(a-c)/den;}
+      let c=0,xmed=0;
+      for(let j=1;j<N;j++){const add=0.5*(f[j-1]+f[j])*h;if(c+add>=0.5){xmed=X0+(j-1)*h+h*(0.5-c)/add;break;}c+=add;}
+      tD.push(d);tMed.push(xmed);tMod.push(xm);
+    }
+  })();
+  const interp=(xs,ys,x)=>{ // xs monotonic (either direction)
+    const n=xs.length,inc=xs[n-1]>xs[0];
+    if(inc?x<=xs[0]:x>=xs[0])return ys[0];
+    if(inc?x>=xs[n-1]:x<=xs[n-1])return ys[n-1];
+    let lo=0,hi=n-1;
+    while(hi-lo>1){const mid=(lo+hi)>>1;if(inc?xs[mid]<=x:xs[mid]>=x)lo=mid;else hi=mid;}
+    const t=(x-xs[lo])/(xs[hi]-xs[lo]);return ys[lo]+t*(ys[hi]-ys[lo]);
+  };
+  const medOff=d=>interp(tD,tMed,d), modOff=d=>interp(tD,tMod,d);
+  const MEDMAX=Math.max(...tMed.map(Math.abs)), MODMAX=Math.max(...tMod.map(Math.abs));
+
+  let state={m:0,s:1,d:0};
+
+  // static grid + axes
+  const gGrid=el('g',{});
+  for(let i=0;i<=10;i++){const y=i/10;
+    el('line',{x1:L,x2:W-R,y1:py(y),y2:py(y),stroke:'var(--grid)','stroke-width':1},gGrid);
+    if(i%2===0)el('text',{x:L-8,y:py(y)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)','font-family':'var(--sans)'},gGrid).textContent=y.toFixed(1);
+  }
+  for(let x=XMIN;x<=XMAX;x+=2){
+    el('line',{x1:px(x),x2:px(x),y1:T,y2:py(0),stroke:'var(--grid)','stroke-width':1},gGrid);
+    el('text',{x:px(x),y:py(0)+18,'text-anchor':'middle','font-size':12,fill:'var(--ink)','font-family':'var(--sans)'},gGrid).textContent=x<0?'−'+Math.abs(x):x;
+  }
+  el('line',{x1:L,x2:W-R,y1:py(0),y2:py(0),stroke:'var(--ink)','stroke-width':1.5});
+  el('text',{x:L-8,y:py(0)+18,'text-anchor':'end','font-size':12,fill:'var(--ink)','font-weight':700,'font-family':'var(--sans)'}).textContent='x';
+  el('text',{x:L-8,y:py(0)+50,'text-anchor':'end','font-size':12,fill:'var(--mean)','font-weight':700,'font-family':'var(--sans)'}).textContent='z';
+  el('text',{x:14,y:T+(H-T-B)/2,'font-size':12,fill:'var(--muted)','font-family':'var(--sans)',transform:`rotate(-90 14 ${T+(H-T-B)/2})`,'text-anchor':'middle'}).textContent='density';
+
+  const gBands=el('g',{});
+  const refPath=el('path',{fill:'none',stroke:'var(--ref)','stroke-width':1.5,'stroke-dasharray':'5 4'});
+  const curve=el('path',{fill:'none',stroke:'var(--curve)','stroke-width':3,'stroke-linejoin':'round'});
+  const gMarks=el('g',{});
+  const gZ=el('g',{});
+  const hoverLine=el('line',{stroke:'var(--ink)','stroke-width':1,'stroke-dasharray':'2 3',opacity:0});
+  const hoverDot=el('circle',{r:5,fill:'var(--panel)',stroke:'var(--curve)','stroke-width':2.5,opacity:0});
+
+  const pathFor=(f,a,b)=>{let d='';const n=300;for(let i=0;i<=n;i++){const x=a+(b-a)*i/n;d+=(i?'L':'M')+px(x).toFixed(2)+' '+py(f(x)).toFixed(2);}return d;};
+  const areaFor=(f,a,b)=>{a=Math.max(a,XMIN);b=Math.min(b,XMAX);if(b<=a)return'';return pathFor(f,a,b)+`L${px(b)} ${py(0)}L${px(a)} ${py(0)}Z`;};
+  const stdN={xi:0,w:1,a:0};
+  refPath.setAttribute('d',pathFor(x=>pdfP(x,stdN),XMIN,XMAX));
+
+  let cdfGrid=null;
+  function buildCdf(p,m,s){
+    const N=1601,a=m-9*s,b=m+9*s,h=(b-a)/(N-1),xs=new Float64Array(N),cs=new Float64Array(N);
+    let prev=pdfP(a,p),c=0;xs[0]=a;
+    for(let j=1;j<N;j++){const x=a+j*h,f=pdfP(x,p);c+=0.5*(prev+f)*h;prev=f;xs[j]=x;cs[j]=c;}
+    for(let j=0;j<N;j++)cs[j]/=c;
+    return{xs,cs,at:x=>interp(xs,cs,x)};
+  }
+
+  function syncSliders(){
+    const {m,s,d}=state;
+    med.min=(m-MEDMAX*s).toFixed(3);med.max=(m+MEDMAX*s).toFixed(3);
+    mod.min=(m-MODMAX*s).toFixed(3);mod.max=(m+MODMAX*s).toFixed(3);
+    med.value=m+medOff(d)*s;mod.value=m+modOff(d)*s;mu.value=m;sd.value=s;
+    $('medMin').textContent=fmt(+med.min);$('medMax').textContent=fmt(+med.max);
+    $('modMin').textContent=fmt(+mod.min);$('modMax').textContent=fmt(+mod.max);
+  }
+
+  function marker(x,yTop,color,dash,label,level){
+    el('line',{x1:px(x),x2:px(x),y1:py(0),y2:yTop,stroke:color,'stroke-width':2.5,'stroke-dasharray':dash,'stroke-linecap':dash?'butt':'round'},gMarks);
+    const ly=T-18+level*15;
+    el('line',{x1:px(x),x2:px(x),y1:ly+3,y2:yTop,stroke:color,'stroke-width':1,opacity:.35},gMarks);
+    el('text',{x:px(x),y:ly,'text-anchor':'middle','font-size':12,'font-weight':700,fill:color,'font-family':'var(--sans)'},gMarks).textContent=label;
+  }
+
+  function draw(){
+    const {m,s,d}=state,p=params(m,s,d),f=x=>pdfP(x,p);
+    const xMed=m+medOff(d)*s,xMod=m+modOff(d)*s;
+    cdfGrid=buildCdf(p,m,s);
+    $('muVal').textContent=fmt(m);$('sdVal').textContent=s.toFixed(2);
+    $('medVal').textContent=fmt(xMed);$('modVal').textContent=fmt(xMod);
+    curve.setAttribute('d',pathFor(f,XMIN,XMAX));
+    gBands.innerHTML='';
+    if(showBands.checked){[[3,'var(--band3)'],[2,'var(--band2)'],[1,'var(--band1)']].forEach(([k,c])=>el('path',{d:areaFor(f,m-k*s,m+k*s),fill:c},gBands));}
+    ['lb1','lb2'].forEach(id=>$(id).style.display=showBands.checked?'':'none');
+    refPath.style.display=showRef.checked?'':'none';
+    $('refLegend').style.display=showRef.checked?'':'none';
+
+    // markers, labels staggered when close together
+    gMarks.innerHTML='';
+    const marks=[
+      {x:m,c:'var(--mean)',dash:'',t:'mean '+fmt(m)},
+      {x:xMed,c:'var(--median)',dash:'6 4',t:'median '+fmt(xMed)},
+      {x:xMod,c:'var(--mode)',dash:'2 4',t:'mode '+fmt(xMod)}
+    ];
+    const sorted=[...marks].sort((a,b)=>a.x-b.x);let lastX=-1e9,lvl=0;
+    sorted.forEach(mk=>{const X=px(mk.x);lvl=(X-lastX<95)?lvl+1:0;mk.level=lvl;lastX=X;});
+    if(Math.abs(px(xMod)-px(m))<3&&Math.abs(px(xMed)-px(m))<3){
+      marker(m,py(f(m)),'var(--mean)','','mean = median = mode '+fmt(m),0);
+    } else marks.forEach(mk=>marker(mk.x,py(f(mk.x)),mk.c,mk.dash,mk.t,mk.level));
+
+    // z axis
+    gZ.innerHTML='';const zy=py(0)+34;
+    el('line',{x1:L,x2:W-R,y1:zy,y2:zy,stroke:'var(--mean)','stroke-width':1,opacity:.5},gZ);
+    for(let z=Math.ceil((XMIN-m)/s);z<=Math.floor((XMAX-m)/s);z++){
+      const x=px(m+z*s);
+      el('line',{x1:x,x2:x,y1:zy-4,y2:zy+4,stroke:'var(--mean)','stroke-width':1.5},gZ);
+      el('text',{x,y:zy+17,'text-anchor':'middle','font-size':12,fill:'var(--mean)','font-weight':z===0?700:400,'font-family':'var(--sans)'},gZ).textContent=z<0?'−'+Math.abs(z):z;
+    }
+
+    const g1=d*SQ2PI,skew=(4-Math.PI)/2*Math.pow(g1,3)/Math.pow(1-g1*g1,1.5);
+    const w1=cdfGrid.at(m+s)-cdfGrid.at(m-s),w2=cdfGrid.at(m+2*s)-cdfGrid.at(m-2*s);
+    $('oMean').textContent=fmt(m);$('oMed').textContent=fmt(xMed);$('oMod').textContent=fmt(xMod);
+    $('oSd').textContent=s.toFixed(2);$('oVar').textContent=(s*s).toFixed(2);
+    $('oSkew').textContent=fmt(skew);
+    $('o1').textContent=(w1*100).toFixed(1)+'%';$('o2').textContent=(w2*100).toFixed(1)+'%';
+
+    let msg;
+    if(Math.abs(skew)<0.02)msg='<b>Symmetric.</b> Mean, median and mode sit on the same point, so this is a normal distribution.';
+    else if(skew>0)msg='<b>Right-skewed (positive skew).</b> The long tail points right, so the order is mode < median < mean. The mean is pulled toward the tail.';
+    else msg='<b>Left-skewed (negative skew).</b> The long tail points left, so the order is mean < median < mode. The mean is pulled toward the tail.';
+    $('shape').innerHTML=msg;
+  }
+
+  function hover(ev){
+    const r=svg.getBoundingClientRect(),sx=(ev.clientX-r.left)/r.width*W;
+    if(sx<L||sx>W-R){hide();return;}
+    const {m,s,d}=state,x=xFromPx(sx),y=pdfP(x,params(m,s,d)),z=(x-m)/s;
+    hoverLine.setAttribute('x1',sx);hoverLine.setAttribute('x2',sx);hoverLine.setAttribute('y1',T);hoverLine.setAttribute('y2',py(0)+34);
+    hoverDot.setAttribute('cx',sx);hoverDot.setAttribute('cy',py(y));
+    hoverLine.setAttribute('opacity',1);hoverDot.setAttribute('opacity',1);
+    tip.innerHTML=`x = ${fmt(x)} &nbsp; z = ${fmt(z)}<br>density ${y.toFixed(3)} &nbsp; ${(cdfGrid.at(x)*100).toFixed(1)}% below`;
+    const pr=plot.getBoundingClientRect();
+    let left=ev.clientX-pr.left+12,top=(py(y)/H)*r.height+(r.top-pr.top)-52;
+    tip.style.opacity=1;
+    if(left+tip.offsetWidth>pr.width-6)left=ev.clientX-pr.left-tip.offsetWidth-12;
+    tip.style.left=left+'px';tip.style.top=Math.max(4,top)+'px';
+  }
+  function hide(){tip.style.opacity=0;hoverLine.setAttribute('opacity',0);hoverDot.setAttribute('opacity',0);}
+  svg.addEventListener('pointermove',hover);svg.addEventListener('pointerdown',hover);svg.addEventListener('pointerleave',hide);
+
+  mu.addEventListener('input',()=>{state.m=+mu.value;syncSliders();draw();hide();});
+  sd.addEventListener('input',()=>{state.s=+sd.value;syncSliders();draw();hide();});
+  med.addEventListener('input',()=>{state.d=interp(tMed,tD,(+med.value-state.m)/state.s);mod.value=state.m+modOff(state.d)*state.s;draw();hide();});
+  mod.addEventListener('input',()=>{state.d=interp(tMod,tD,(+mod.value-state.m)/state.s);med.value=state.m+medOff(state.d)*state.s;draw();hide();});
+  [showRef,showBands].forEach(e=>e.addEventListener('input',draw));
+
+  function animateTo(target){
+    const from={...state},t0=performance.now(),dur=matchMedia('(prefers-reduced-motion: reduce)').matches?0:550;
+    function step(t){const k=dur?Math.min(1,(t-t0)/dur):1,e=1-Math.pow(1-k,3);
+      for(const key in target)state[key]=from[key]+(target[key]-from[key])*e;
+      syncSliders();draw();if(k<1)requestAnimationFrame(step);}
+    requestAnimationFrame(step);
+  }
+  $('reset').addEventListener('click',()=>animateTo({m:0,s:1,d:0}));
+  $('sym').addEventListener('click',()=>animateTo({d:0}));
+
+  syncSliders();draw();
+})();
+</script>
+</body>
+</html>
